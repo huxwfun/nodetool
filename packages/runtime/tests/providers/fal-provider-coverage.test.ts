@@ -155,6 +155,82 @@ describe("FalProvider — textToImage arg shaping", () => {
     expect(captured.prompt).toBe("cat");
   });
 
+  it("uses custom dimensions when the image_size schema accepts objects", async () => {
+    let captured: Record<string, unknown> = {};
+    const subscribeMock = vi.fn(async (_id: string, opts: any) => {
+      captured = opts.input;
+      return { data: { images: [{ url: "https://fal.ai/r.png" }] } };
+    });
+    vi.stubGlobal("fetch", okFetch());
+    const p = createProvider();
+    (p as any)._client = { subscribe: subscribeMock };
+
+    await p.textToImage({
+      prompt: "cat",
+      model: IMG_MODEL,
+      width: 2048,
+      height: 1152,
+      aspectRatio: "16:9"
+    });
+
+    expect(captured.image_size).toEqual({ width: 2048, height: 1152 });
+  });
+
+  it("keeps presets for pure-enum image_size schemas", async () => {
+    let captured: Record<string, unknown> = {};
+    const subscribeMock = vi.fn(async (_id: string, opts: any) => {
+      captured = opts.input;
+      return { data: { images: [{ url: "https://fal.ai/r.png" }] } };
+    });
+    vi.stubGlobal("fetch", okFetch());
+    const p = createProvider();
+    (p as any)._client = { subscribe: subscribeMock };
+
+    await p.textToImage({
+      prompt: "cat",
+      model: {
+        id: "fal-ai/gpt-image-1.5",
+        name: "GPT Image 1.5",
+        provider: "fal_ai"
+      },
+      width: 3072,
+      height: 2048,
+      aspectRatio: "3:2"
+    });
+
+    expect(captured.image_size).toBe("1536x1024");
+  });
+
+  it("keeps separate aspect ratio and resolution fields unchanged", async () => {
+    let captured: Record<string, unknown> = {};
+    const subscribeMock = vi.fn(async (_id: string, opts: any) => {
+      captured = opts.input;
+      return { data: { images: [{ url: "https://fal.ai/r.png" }] } };
+    });
+    vi.stubGlobal("fetch", okFetch());
+    const p = createProvider();
+    (p as any)._client = { subscribe: subscribeMock };
+
+    await p.textToImage({
+      prompt: "cat",
+      model: {
+        id: "fal-ai/nano-banana-pro",
+        name: "Nano Banana Pro",
+        provider: "fal_ai"
+      },
+      width: 7282,
+      height: 4096,
+      aspectRatio: "16:9",
+      resolution: "4K"
+    });
+
+    expect(captured).toMatchObject({
+      aspect_ratio: "16:9",
+      resolution: "4K"
+    });
+    expect(captured).not.toHaveProperty("image_size");
+  });
+
   it("includes seed when a positive value is given", async () => {
     let captured: any;
     const subscribeMock = vi.fn(async (_id: string, opts: any) => {
@@ -167,6 +243,37 @@ describe("FalProvider — textToImage arg shaping", () => {
 
     await p.textToImage({ prompt: "x", model: IMG_MODEL, seed: 99 });
     expect(captured.seed).toBe(99);
+  });
+
+  it("sends a legal 4K custom size to GPT Image 2 Edit", async () => {
+    let captured: Record<string, unknown> = {};
+    const subscribeMock = vi.fn(
+      async (_id: string, opts: { input: Record<string, unknown> }) => {
+        captured = opts.input;
+        return { data: { images: [{ url: "https://fal.ai/r.png" }] } };
+      }
+    );
+    vi.stubGlobal("fetch", okFetch());
+    const p = createProvider();
+    (p as any)._client = {
+      subscribe: subscribeMock,
+      storage: {
+        upload: vi.fn().mockResolvedValue("https://fal.ai/input.png")
+      }
+    };
+
+    await p.imageToImage([new Uint8Array([1, 2, 3])], {
+      prompt: "edit",
+      model: {
+        id: "openai/gpt-image-2/edit",
+        name: "GPT Image 2 Edit",
+        provider: "fal_ai"
+      },
+      targetWidth: 7282,
+      targetHeight: 4096
+    });
+
+    expect(captured.image_size).toEqual({ width: 3840, height: 2160 });
   });
 });
 

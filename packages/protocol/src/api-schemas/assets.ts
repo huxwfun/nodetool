@@ -204,3 +204,12 @@ export const byFilenameInput = z.object({
   filename: z.string().min(1)
 });
 export type ByFilenameInput = z.infer<typeof byFilenameInput>;
+
+// ── localPath ────────────────────────────────────────────────────
+// Where the bytes sit on the server's own disk, for pasting into a tool that
+// reads files rather than URLs. `null` whenever no such path exists to hand
+// out: a remote storage backend, a folder, or an asset whose object is gone.
+export const localPathOutput = z.object({
+  path: z.string().nullable()
+});
+export type LocalPathOutput = z.infer<typeof localPathOutput>;

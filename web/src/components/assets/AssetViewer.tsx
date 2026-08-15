@@ -31,6 +31,7 @@ import {
 import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import ContentPasteGoIcon from "@mui/icons-material/ContentPasteGo";
 import CheckIcon from "@mui/icons-material/Check";
 import CompareIcon from "@mui/icons-material/Compare";
 import EditIcon from "@mui/icons-material/Edit";
@@ -49,6 +50,7 @@ import { useCombo } from "../../stores/KeyPressedStore";
 import { useTheme } from "@mui/material/styles";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { useAssetDownload } from "../../hooks/assets/useAssetDownload";
+import { useAssetLocationCopy } from "../../hooks/assets/useAssetLocationCopy";
 import { useAssetNavigation } from "../../hooks/assets/useAssetNavigation";
 import { useAssetDisplay } from "../../hooks/assets/useAssetDisplay";
 import { useEditVideoAsset } from "../../hooks/useEditVideoAsset";
@@ -352,6 +354,12 @@ const AssetViewer: React.FC<AssetViewerProps> = (props) => {
   );
 
   const { handleDownload } = useAssetDownload({ currentAsset, url });
+
+  const {
+    kind: locationKind,
+    copied: locationCopied,
+    copyLocation
+  } = useAssetLocationCopy({ asset: currentAsset, url, enabled: open });
 
   const isImage = useMemo(() => {
     const ct = currentAsset?.content_type || contentType || "";
@@ -896,6 +904,22 @@ const AssetViewer: React.FC<AssetViewerProps> = (props) => {
               }
               onClick={handleCopyToClipboard}
               className="button copy"
+              nodrag={false}
+              sx={viewerActionButtonSx}
+            />
+          )}
+          {locationKind && !compareMode && (
+            <ToolbarIconButton
+              icon={locationCopied ? <CheckIcon /> : <ContentPasteGoIcon />}
+              tooltip={
+                locationCopied
+                  ? "Copied!"
+                  : locationKind === "path"
+                    ? "Copy File Path"
+                    : "Copy Link"
+              }
+              onClick={copyLocation}
+              className="button copy-location"
               nodrag={false}
               sx={viewerActionButtonSx}
             />

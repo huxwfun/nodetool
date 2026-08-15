@@ -10,10 +10,12 @@
  */
 
 import { Buffer } from "node:buffer";
+import { existsSync } from "node:fs";
 import { Asset } from "@nodetool-ai/models";
 import type { Asset as AssetModel } from "@nodetool-ai/models";
 import {
   createLogger,
+  getAssetFilePath,
   loadAssetStorageConfig,
   type StorageConfig
 } from "@nodetool-ai/config";
@@ -59,6 +61,7 @@ import {
   recursiveOutput,
   searchInput,
   searchOutput,
+  localPathOutput,
   type AssetResponse
 } from "@nodetool-ai/protocol/api-schemas/assets.js";
 
@@ -322,6 +325,50 @@ export const assetsRouter = router({
         throwApiError(ApiErrorCode.NOT_FOUND, "Asset not found");
       }
       return toAssetResponse(asset);
+    }),
+
+  /**
+   * Where this asset's bytes sit on the server's own filesystem, so a caller
+   * can hand the path to something that reads files instead of URLs.
+   *
+   * Answers `null` rather than guessing whenever no such path is meaningful:
+   * a remote storage backend (the bytes are not on this disk at all), a
+   * folder, or a row whose object has gone missing. The client falls back to
+   * the asset URL in that case. Both key shapes are probed, since objects
+   * written before the owner-prefixed layout are still flat.
+   */
+  localPath: protectedProcedure
+    .input(getInput)
+    .output(localPathOutput)
+    .query(async ({ ctx, input }) => {
+      // The synthetic "Home" folder `get` answers for has no row and no bytes.
+      if (input.id === ctx.userId) {
+        return { path: null };
+      }
+      if (loadAssetStorageConfig().kind !== "file") {
+        return { path: null };
+      }
+
+      const asset = await Asset.find(ctx.userId, input.id);
+      if (!asset) {
+        throwApiError(ApiErrorCode.NOT_FOUND, "Asset not found");
+      }
+      if (asset.content_type === "folder") {
+        return { path: null };
+      }
+
+      for (const fileName of assetFileNameCandidates(
+        asset.id,
+        asset.content_type
+      )) {
+        for (const key of assetKeyCandidates(asset.user_id, fileName)) {
+          const filePath = getAssetFilePath(key);
+          if (existsSync(filePath)) {
+            return { path: filePath };
+          }
+        }
+      }
+      return { path: null };
     }),
 
   /**

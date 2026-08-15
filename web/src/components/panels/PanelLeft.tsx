@@ -7,6 +7,10 @@ import {
 } from "@mui/material";
 import { ToolbarIconButton, FlexColumn, Box, Z_INDEX, SPACING, getSpacingPx } from "../ui_primitives";
 import { useResizePanel } from "../../hooks/handlers/useResizePanel";
+import {
+  shouldCloseLeftPanelOnOutsideClick,
+  useLeftPanelOutsideClose
+} from "../../hooks/handlers/useLeftPanelOutsideClose";
 import { BORDER_RADIUS } from "../ui_primitives";
 import isEqual from "../../utils/isEqual";
 import { memo, useCallback, useEffect, useMemo } from "react";
@@ -884,6 +888,21 @@ const PanelLeft: React.FC = () => {
   const handleMobileClose = useCallback(() => {
     setVisibility(false);
   }, [setVisibility]);
+
+  const handleOutsideClose = useCallback(() => {
+    setVisibility(false);
+  }, [setVisibility]);
+
+  // The drawer floats over the content, so a press elsewhere dismisses it.
+  useLeftPanelOutsideClose(
+    shouldCloseLeftPanelOnOutsideClick({
+      isVisible,
+      isMobile,
+      activeView: displayActiveView,
+      activeTabType
+    }),
+    handleOutsideClose
+  );
 
   useEffect(() => {
     if (!isWorkflowEditActive && isWorkflowEditOnlyView(activeView)) {

@@ -20,6 +20,35 @@ trap cleanup EXIT INT TERM
 # system-Node backend (dev-server / tsx). If you hit NODE_MODULE_VERSION errors,
 # run: npm run rebuild:native
 
+# Pin the dev backend to the .nvmrc Node rather than whatever the shell happens
+# to carry. electron/src/server.ts spawns it as
+# `${NODETOOL_NODE:-${npm_node_execpath:-node}}`, so a shell on another major
+# hands it a runtime whose ABI better-sqlite3 was not built for, and the run
+# dies five seconds later with a NODE_MODULE_VERSION mismatch that reads like a
+# broken install. Resolving it here keeps `nvm alias default` a per-machine
+# choice instead of a requirement of this repo.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PINNED_NODE_VERSION="$(tr -d '[:space:]' < "${REPO_ROOT}/.nvmrc")"
+PINNED_NODE_MAJOR="${PINNED_NODE_VERSION%%.*}"
+
+if [[ -z "${NODETOOL_NODE:-}" ]]; then
+  NVM_NODE="${NVM_DIR:-$HOME/.nvm}/versions/node/v${PINNED_NODE_VERSION}/bin/node"
+  if [[ -x "${NVM_NODE}" ]]; then
+    export NODETOOL_NODE="${NVM_NODE}"
+  elif [[ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null)" == "${PINNED_NODE_MAJOR}" ]]; then
+    # Not an nvm layout (homebrew, asdf, volta, CI image), but the Node already
+    # on PATH is the pinned major — the spawn default is correct as-is.
+    :
+  else
+    echo "ERROR: no Node ${PINNED_NODE_VERSION} available for the dev backend." >&2
+    echo "  .nvmrc pins ${PINNED_NODE_VERSION}; this shell has $(node -v 2>/dev/null || echo 'no node')." >&2
+    echo "  Fix: nvm install ${PINNED_NODE_VERSION}" >&2
+    echo "  Or point NODETOOL_NODE at a Node ${PINNED_NODE_MAJOR} binary yourself." >&2
+    exit 1
+  fi
+fi
+echo "Dev backend Node: ${NODETOOL_NODE:-$(command -v node)}"
+
 # Start web Vite server
 echo "Starting web Vite server on ${WEB_DEV_SERVER_URL}..."
 npm --prefix web run dev &
